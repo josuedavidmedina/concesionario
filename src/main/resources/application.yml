@@ -66,8 +66,8 @@ application:
   # ---- Supabase Storage ----
   supabase:
     url: ${SUPABASE_URL:https://wzhmnlutyujmyjpshrks.supabase.co}
-    anon-key: ${SUPABASE_ANON_KEY}
-    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+    anon-key: ${SUPABASE_ANON_KEY:dummy-anon-key}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:dummy-local-key}
     bucket-name: ${SUPABASE_BUCKET:vehicle-images}
 
   # ---- Paginación por defecto ----
@@ -108,7 +108,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:aws-1-us-west-1.pooler.supabase.com}:${DB_PORT:5432}/${DB_NAME:postgres}?sslmode=require
     username: ${DB_USER:postgres.wzhmnlutyujmyjpshrks}
-    password: ${DB_PASSWORD}
+    password: ${DB_PASSWORD:saraycure2..}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5
