@@ -1,0 +1,137 @@
+# Arquitectura del Sistema
+
+## Diagrama de capas
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    FRONTEND (React + Vite)               │
+│  ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐  │
+│  │   UI     │ │  Pages   │ │   API    │ │   Auth     │  │
+│  │ shadcn/ui│ │  Vehicle │ │  client  │ │  Context   │  │
+│  │ Tailwind │ │  Sales   │ │  axios   │ │  JWT       │  │
+│  └─────────┘ └──────────┘ └──────────┘ └────────────┘  │
+└──────────────────────┬──────────────────────────────────┘
+                       │ HTTP /api/*
+                       │ Proxy Vite -> localhost:8080
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│                   BACKEND (Spring Boot 3)                │
+│                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │ Security  │  │   REST   │  │ Service  │  │  JPA   │ │
+│  │ JWT Filter│──▶ Controller─▶  Layer   ──▶  Repo   │ │
+│  │ CORS      │  │   @Valid │  │ @Transactional│Specs │ │
+│  └──────────┘  └──────────┘  └──────────┘  └────────┘ │
+│                                    │                    │
+│                              ┌─────▼──────┐             │
+│                              │   Mapper   │             │
+│                              │  MapStruct │             │
+│                              └────────────┘             │
+└──────────────────────┬──────────────────────────────────┘
+                       │ JDBC / HikariCP
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│               SUPABASE (PostgreSQL 15)                   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐ │
+│  │ vehicles │ │  sales   │ │ customers│ │  brands    │ │
+│  │ vehicle_ │ │  sale_   │ │ customer_│ │  vehicle_  │ │
+│  │ images   │ │  items   │ │ contacts │ │  types     │ │
+│  └──────────┘ └──────────┘ └──────────┘ └────────────┘ │
+│                                                         │
+│  Storage: vehicle-images (fotos de vehículos)           │
+│  Auth:    Integración JWT propia                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Flujo de autenticación
+
+```
+Browser                   Backend                  Supabase
+  │                         │                        │
+  │  POST /auth/login       │                        │
+  │  {email, password}      │                        │
+  │────────────────────────▶│                        │
+  │                         │  SELECT * FROM users   │
+  │                         │───────────────────────▶│
+  │                         │◀───────────────────────│
+  │                         │                        │
+  │                         │  BCrypt.verify()       │
+  │                         │  JWT.generate({role})  │
+  │                         │                        │
+  │◀────────────────────────│                        │
+  │  {accessToken,          │                        │
+  │   refreshToken, role}   │                        │
+  │                         │                        │
+  │  ─── Almacena en ───   │                        │
+  │  localStorage           │                        │
+```
+
+## Flujo de petición autenticada
+
+```
+Browser                          Backend
+  │                                │
+  │  GET /vehicles                 │
+  │  Authorization: Bearer JWT     │
+  │───────────────────────────────▶│
+  │                                │
+  │                     ┌──────────▼──────────┐
+  │                     │  JwtAuthFilter       │
+  │                     │  - Extract token     │
+  │                     │  - Validate signature│
+  │                     │  - Set SecurityContext│
+  │                     └──────────┬──────────┘
+  │                                │
+  │                     ┌──────────▼──────────┐
+  │                     │  VehicleController   │
+  │                     │  @PreAuthorize       │
+  │                     └──────────┬──────────┘
+  │                                │
+  │                     ┌──────────▼──────────┐
+  │                     │  VehicleService     │
+  │                     │  @Cacheable         │
+  │                     └──────────┬──────────┘
+  │                                │
+  │                     ┌──────────▼──────────┐
+  │                     │  VehicleRepository  │
+  │                     │  JPA Specifications │
+  │                     └──────────┬──────────┘
+  │                                │
+  │◀───────────────────────────────│
+  │  PageResponse<VehicleResponse> │
+```
+
+## Patrones de diseño
+
+| Patrón | Uso |
+|--------|-----|
+| **DTO** | Separación entre entidades JPA y datos de la API |
+| **Repository** | Abstracción de persistencia con Spring Data JPA |
+| **Specification** | Filtros dinámicos sin SQL nativo |
+| **Mapper** | MapStruct para conversión Entity ↔ DTO |
+| **Builder** | Construcción de objetos complejos (Lombok) |
+| **Strategy** | Roles y permisos vía Spring Security |
+| **Interceptor** | JWT filter en la cadena de filtros HTTP |
+| **Template Method** | BaseEntity con auditoría automática |
+
+## Decisiones técnicas
+
+### ¿Por qué UUID en lugar de Long?
+- IDs únicos globales sin depender de secuencias
+- Previene enumeración de recursos
+- Adecuado para sistemas distribuidos
+
+### ¿Por qué soft-delete?
+- Los vehículos no se eliminan físicamente
+- Se marcan como `deleted = TRUE`
+- Todas las consultas filtran `WHERE deleted = FALSE`
+
+### ¿Por qué `ddl-auto: validate`?
+- Control total del esquema vía `schema.sql`
+- Hibernate valida que las entidades coincidan con la BD
+- Evita migraciones automáticas en producción
+
+### ¿Por qué MapStruct y no manual mapping?
+- Tipado fuerte en compilación
+- Cero overhead en runtime
+- Reducción de código boilerplate

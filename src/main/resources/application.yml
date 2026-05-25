@@ -1,0 +1,157 @@
+# =========================================
+# application.yml — Configuración base
+# Sistema de Concesionario de Vehículos
+# =========================================
+
+spring:
+  application:
+    name: concesionario-backend
+
+  # ---- Perfil activo (cambiar a prod en producción) ----
+  profiles:
+    active: ${SPRING_PROFILE:dev}
+
+  # ---- JPA / Hibernate ----
+  jpa:
+    hibernate:
+      ddl-auto: validate          # En dev se puede usar update; en prod siempre validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+    open-in-view: false           # Desactivado por buenas prácticas
+
+  # ---- Upload de archivos ----
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+  # ---- Cache ----
+  cache:
+    type: simple                  # Cambiar a redis en producción
+
+# ---- Server ----
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# ---- Swagger / OpenAPI ----
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  info:
+    title: Concesionario API
+    description: API REST profesional para gestión de concesionario de vehículos
+    version: 1.0.0
+
+# ---- JWT (valores deben venir de variables de entorno) ----
+application:
+  jwt:
+    secret: ${JWT_SECRET:myConcesionarioSuperSecretKey2024ChangeThisInProduction!}
+    expiration: ${JWT_EXPIRATION:86400000}       # 24 horas en ms
+    refresh-expiration: ${JWT_REFRESH_EXP:604800000}  # 7 días en ms
+
+  # ---- Supabase Storage ----
+  supabase:
+    url: ${SUPABASE_URL:https://wzhmnlutyujmyjpshrks.supabase.co}
+    anon-key: ${SUPABASE_ANON_KEY}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+    bucket-name: ${SUPABASE_BUCKET:vehicle-images}
+
+  # ---- Paginación por defecto ----
+  pagination:
+    default-page-size: 15
+    max-page-size: 100
+
+# ---- Actuator ----
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+    username: ${DB_USER:postgres.wzhmnlutyujmyjpshrks}
+
+# ---- Logging base ----
+logging:
+  level:
+    com.concesionario: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+
+---
+# =========================================
+# PERFIL DEV
+# =========================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  sql:
+    init:
+      mode: always
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:aws-1-us-west-1.pooler.supabase.com}:${DB_PORT:5432}/${DB_NAME:postgres}?sslmode=require
+    username: ${DB_USER:postgres.wzhmnlutyujmyjpshrks}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    com.concesionario: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+---
+# =========================================
+# PERFIL PROD
+# =========================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+logging:
+  level:
+    com.concesionario: WARN
+    root: ERROR
+  file:
+    name: /var/log/concesionario/app.log

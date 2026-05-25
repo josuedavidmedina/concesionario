@@ -1,0 +1,60 @@
+# =============================================
+# docker-compose.yml — Entorno de desarrollo
+# Uso: docker-compose up -d
+# =============================================
+version: '3.8'
+
+services:
+
+  # ---- Backend Spring Boot ----
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: concesionario-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILE: dev
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      JWT_REFRESH_EXP: ${JWT_REFRESH_EXP:-604800000}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-vehicle-images}
+    volumes:
+      - logs_data:/var/log/concesionario
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - concesionario-net
+
+  # ---- Redis para cache (opcional, descomentar en producción) ----
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: concesionario-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - concesionario-net
+
+volumes:
+  logs_data:
+  # redis_data:
+
+networks:
+  concesionario-net:
+    driver: bridge
